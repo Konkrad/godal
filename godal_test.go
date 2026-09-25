@@ -5488,3 +5488,77 @@ func TestDemColorReliefInvalidFilename(t *testing.T) {
 	_, err = vrtDs.Dem("/vsimem/out.tiff", "color-relief", invalidColorReliefFilename, []string{})
 	assert.Error(t, err)
 }
+
+func tpsTestGCPs() []GCP {
+	// pixel/line -> X/Y is the affine mapping X = (pixel-0.5)/100, Y = (line-0.5)/5
+	return []GCP{
+		{PszId: "0", DfGCPPixel: 0.5, DfGCPLine: 0.5, DfGCPX: 0, DfGCPY: 0},
+		{PszId: "1", DfGCPPixel: 1000.5, DfGCPLine: 0.5, DfGCPX: 10, DfGCPY: 0},
+		{PszId: "2", DfGCPPixel: 1000.5, DfGCPLine: 100.5, DfGCPX: 10, DfGCPY: 20},
+		{PszId: "3", DfGCPPixel: 0.5, DfGCPLine: 100.5, DfGCPX: 0, DfGCPY: 20},
+		{PszId: "4", DfGCPPixel: 500.5, DfGCPLine: 50.5, DfGCPX: 5, DfGCPY: 10},
+	}
+}
+
+func TestTPSTransformer(t *testing.T) {
+	tps, err := NewTPSTransformer(tpsTestGCPs(), false)
+	require.NoError(t, err)
+	defer tps.Close()
+
+	// pixel/line -> georeferenced
+	x := []float64{0.5, 250.5, 1000.5}
+	y := []float64{0.5, 25.5, 100.5}
+	ok := make([]bool, 3)
+	err = tps.Transform(false, x, y, nil, ok)
+	require.NoError(t, err)
+	assert.Equal(t, []bool{true, true, true}, ok)
+	assert.InDeltaSlice(t, []float64{0, 2.5, 10}, x, 1e-6)
+	assert.InDeltaSlice(t, []float64{0, 5, 20}, y, 1e-6)
+
+	// georeferenced -> pixel/line, with z and without successful
+	z := []float64{0, 0, 0}
+	err = tps.Transform(true, x, y, z, nil)
+	require.NoError(t, err)
+	assert.InDeltaSlice(t, []float64{0.5, 250.5, 1000.5}, x, 1e-6)
+	assert.InDeltaSlice(t, []float64{0.5, 25.5, 100.5}, y, 1e-6)
+
+	// empty input is a no-op
+	assert.NoError(t, tps.Transform(false, nil, nil, nil, nil))
+
+	// mismatched lengths
+	assert.Error(t, tps.Transform(false, []float64{1, 2}, []float64{1}, nil, nil))
+	assert.Error(t, tps.Transform(false, []float64{1}, []float64{1}, []float64{1, 2}, nil))
+	assert.Error(t, tps.Transform(false, []float64{1}, []float64{1}, nil, make([]bool, 2)))
+
+	tps.Close()
+	tps.Close() //double close is a no-op
+}
+
+func TestTPSTransformerReversed(t *testing.T) {
+	tps, err := NewTPSTransformer(tpsTestGCPs(), true)
+	require.NoError(t, err)
+	defer tps.Close()
+
+	// reversed: the forward direction now maps georeferenced -> pixel/line
+	x := []float64{2.5}
+	y := []float64{5}
+	err = tps.Transform(false, x, y, nil, nil, ErrLogger(eh().ErrorHandler))
+	require.NoError(t, err)
+	assert.InDelta(t, 250.5, x[0], 1e-6)
+	assert.InDelta(t, 25.5, y[0], 1e-6)
+}
+
+func TestTPSTransformerInvalidGCPs(t *testing.T) {
+	ehc := eh()
+	_, err := NewTPSTransformer([]GCP{}, false, ErrLogger(ehc.ErrorHandler))
+	assert.Error(t, err)
+
+	// duplicate GCPs make the spline system unsolvable
+	dup := []GCP{
+		{DfGCPPixel: 0, DfGCPLine: 0, DfGCPX: 0, DfGCPY: 0},
+		{DfGCPPixel: 0, DfGCPLine: 0, DfGCPX: 1, DfGCPY: 1},
+		{DfGCPPixel: 0, DfGCPLine: 0, DfGCPX: 2, DfGCPY: 2},
+	}
+	_, err = NewTPSTransformer(dup, false)
+	assert.Error(t, err)
+}

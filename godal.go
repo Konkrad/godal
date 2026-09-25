@@ -4329,6 +4329,45 @@ func gdalGCPToGoGCPArray(gcp C.GCPsAndCount) []GCP {
 	return ret
 }
 
+// goGCPArrayToGDALGCPList converts a `[]GCP` (Go) to a `C.goGCPList`. The returned function must
+// be called to release the C strings once the list is no longer needed.
+func goGCPArrayToGDALGCPList(GCPList []GCP) (C.goGCPList, func()) {
+	var gcpList C.goGCPList
+	var (
+		ids       = make([]string, len(GCPList))
+		infos     = make([]string, len(GCPList))
+		gcpPixels = make([]float64, len(GCPList))
+		gcpLines  = make([]float64, len(GCPList))
+		gcpXs     = make([]float64, len(GCPList))
+		gcpYs     = make([]float64, len(GCPList))
+		gcpZs     = make([]float64, len(GCPList))
+	)
+	for i, g := range GCPList {
+		ids[i] = g.PszId
+		infos[i] = g.PszInfo
+		gcpPixels[i] = (g.DfGCPPixel)
+		gcpLines[i] = (g.DfGCPLine)
+		gcpXs[i] = (g.DfGCPX)
+		gcpYs[i] = (g.DfGCPY)
+		gcpZs[i] = (g.DfGCPZ)
+	}
+	cIds := sliceToCStringArray(ids)
+	cInfos := sliceToCStringArray(infos)
+
+	gcpList.pszIds = cIds.cPointer()
+	gcpList.pszInfos = cInfos.cPointer()
+	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
+	gcpList.dfGCPLines = cDoubleArray(gcpLines)
+	gcpList.dfGCPXs = cDoubleArray(gcpXs)
+	gcpList.dfGCPYs = cDoubleArray(gcpYs)
+	gcpList.dfGCPZs = cDoubleArray(gcpZs)
+
+	return gcpList, func() {
+		cIds.free()
+		cInfos.free()
+	}
+}
+
 // GetGCPSpatialRef runs the GDALGetGCPSpatialRef function
 func (ds *Dataset) GCPSpatialRef() *SpatialRef {
 	return &SpatialRef{handle: C.godalGetGCPSpatialRef(ds.handle()), isOwned: false}
@@ -4352,38 +4391,8 @@ func (ds *Dataset) SetGCPs(GCPList []GCP, opts ...SetGCPsOption) error {
 		opt.setSetGCPsOpt(&setGCPsOpts)
 	}
 
-	// Convert `[]GCP` -> `C.goGCPList`
-	var gcpList C.goGCPList
-	var (
-		ids       = make([]string, len(GCPList))
-		infos     = make([]string, len(GCPList))
-		gcpPixels = make([]float64, len(GCPList))
-		gcpLines  = make([]float64, len(GCPList))
-		gcpXs     = make([]float64, len(GCPList))
-		gcpYs     = make([]float64, len(GCPList))
-		gcpZs     = make([]float64, len(GCPList))
-	)
-	for i, g := range GCPList {
-		ids[i] = g.PszId
-		infos[i] = g.PszInfo
-		gcpPixels[i] = (g.DfGCPPixel)
-		gcpLines[i] = (g.DfGCPLine)
-		gcpXs[i] = (g.DfGCPX)
-		gcpYs[i] = (g.DfGCPY)
-		gcpZs[i] = (g.DfGCPZ)
-	}
-	cIds := sliceToCStringArray(ids)
-	defer cIds.free()
-	cInfos := sliceToCStringArray(infos)
-	defer cInfos.free()
-
-	gcpList.pszIds = cIds.cPointer()
-	gcpList.pszInfos = cInfos.cPointer()
-	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
-	gcpList.dfGCPLines = cDoubleArray(gcpLines)
-	gcpList.dfGCPXs = cDoubleArray(gcpXs)
-	gcpList.dfGCPYs = cDoubleArray(gcpYs)
-	gcpList.dfGCPZs = cDoubleArray(gcpZs)
+	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
+	defer freeGCPList()
 
 	cgc := createCGOContext(nil, setGCPsOpts.errorHandler)
 	if setGCPsOpts.sr != nil {
@@ -4407,38 +4416,8 @@ func GCPsToGeoTransform(GCPList []GCP, opts ...GCPsToGeoTransformOption) ([6]flo
 		opt.setGCPsToGeoTransformOpts(&gco)
 	}
 
-	// Convert `[]GCP` -> `C.goGCPList`
-	var gcpList C.goGCPList
-	var (
-		ids       = make([]string, len(GCPList))
-		infos     = make([]string, len(GCPList))
-		gcpPixels = make([]float64, len(GCPList))
-		gcpLines  = make([]float64, len(GCPList))
-		gcpXs     = make([]float64, len(GCPList))
-		gcpYs     = make([]float64, len(GCPList))
-		gcpZs     = make([]float64, len(GCPList))
-	)
-	for i, g := range GCPList {
-		ids[i] = g.PszId
-		infos[i] = g.PszInfo
-		gcpPixels[i] = (g.DfGCPPixel)
-		gcpLines[i] = (g.DfGCPLine)
-		gcpXs[i] = (g.DfGCPX)
-		gcpYs[i] = (g.DfGCPY)
-		gcpZs[i] = (g.DfGCPZ)
-	}
-	cIds := sliceToCStringArray(ids)
-	defer cIds.free()
-	cInfos := sliceToCStringArray(infos)
-	defer cInfos.free()
-
-	gcpList.pszIds = cIds.cPointer()
-	gcpList.pszInfos = cInfos.cPointer()
-	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
-	gcpList.dfGCPLines = cDoubleArray(gcpLines)
-	gcpList.dfGCPXs = cDoubleArray(gcpXs)
-	gcpList.dfGCPYs = cDoubleArray(gcpYs)
-	gcpList.dfGCPZs = cDoubleArray(gcpZs)
+	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
+	defer freeGCPList()
 
 	gt := make([]C.double, 6)
 	cgt := (*C.double)(unsafe.Pointer(&gt[0]))
@@ -4455,6 +4434,129 @@ func GCPsToGeoTransform(GCPList []GCP, opts ...GCPsToGeoTransformOption) ([6]flo
 	}
 
 	return ret, nil
+}
+
+// TPSTransformer is a thin-plate-spline transformer fitted to a list of Ground Control Points,
+// for rasters (e.g. Sentinel-1 GRD/SLC) that have no affine geotransform.
+//
+// It must be released with Close() once no longer needed.
+type TPSTransformer struct {
+	handle unsafe.Pointer
+}
+
+// NewTPSTransformer runs the GDALCreateTPSTransformer function, building a thin-plate-spline
+// transformer from GCPList (typically obtained from Dataset.GCPs()).
+//
+// If reversed is true, the roles of the pixel/line and the georeferenced coordinates are swapped.
+func NewTPSTransformer(GCPList []GCP, reversed bool, opts ...NewTPSTransformerOption) (*TPSTransformer, error) {
+	o := newTPSTransformerOpts{}
+	for _, opt := range opts {
+		opt.setNewTPSTransformerOpt(&o)
+	}
+
+	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
+	defer freeGCPList()
+
+	bReversed := C.int(0)
+	if reversed {
+		bReversed = 1
+	}
+
+	cgc := createCGOContext(nil, o.errorHandler)
+	hndl := C.godalNewTPSTransformer(cgc.cPointer(), gcpList, C.int(len(GCPList)), bReversed)
+	if err := cgc.close(); err != nil {
+		if hndl != nil {
+			C.godalDestroyTPSTransformer(hndl)
+		}
+		return nil, err
+	}
+	return &TPSTransformer{handle: hndl}, nil
+}
+
+// Close releases the TPSTransformer
+func (tps *TPSTransformer) Close() {
+	if tps.handle == nil {
+		return
+	}
+	C.godalDestroyTPSTransformer(tps.handle)
+	tps.handle = nil
+}
+
+// Transform runs the GDALTPSTransform function, transforming points in place.
+//
+// If dstToSrc is false, x/y are pixel/line coordinates (as given by the GCPs) and are transformed
+// to georeferenced coordinates. If dstToSrc is true, x/y are georeferenced coordinates and are
+// transformed back to pixel/line.
+//
+// x and y may not be nil and must be of the same length.
+//
+// z may be nil, or of the same length as x and y.
+//
+// successful may be nil or of the same length as x and y. If non nil, it will contain
+// true or false depending on whether the corresponding point succeeded transformation or not.
+// If nil, an error is returned when any point fails to transform.
+func (tps *TPSTransformer) Transform(dstToSrc bool, x []float64, y []float64, z []float64, successful []bool, opts ...TPSTransformOption) error {
+	o := tpsTransformOpts{}
+	for _, opt := range opts {
+		opt.setTPSTransformOpt(&o)
+	}
+	if len(x) != len(y) {
+		return fmt.Errorf("x and y must be of the same length")
+	}
+	if len(z) > 0 && len(z) != len(x) {
+		return fmt.Errorf("z must be nil or of the same length as x and y")
+	}
+	if successful != nil && len(successful) != len(x) {
+		return fmt.Errorf("successful must be nil or of the same length as x and y")
+	}
+	if len(x) == 0 {
+		return nil
+	}
+
+	cx := make([]C.double, len(x))
+	cy := make([]C.double, len(x))
+	cz := make([]C.double, len(x))
+	cs := make([]C.int, len(x))
+	for i := range x {
+		cx[i] = C.double(x[i])
+		cy[i] = C.double(y[i])
+		if len(z) > 0 {
+			cz[i] = C.double(z[i])
+		}
+	}
+
+	bDstToSrc := C.int(0)
+	if dstToSrc {
+		bDstToSrc = 1
+	}
+
+	cgc := createCGOContext(nil, o.errorHandler)
+	C.godalTPSTransform(cgc.cPointer(), tps.handle, bDstToSrc, C.int(len(x)),
+		(*C.double)(unsafe.Pointer(&cx[0])), (*C.double)(unsafe.Pointer(&cy[0])),
+		(*C.double)(unsafe.Pointer(&cz[0])), (*C.int)(unsafe.Pointer(&cs[0])))
+	if err := cgc.close(); err != nil {
+		return err
+	}
+
+	failed := false
+	for i := range x {
+		x[i] = float64(cx[i])
+		y[i] = float64(cy[i])
+		if len(z) > 0 {
+			z[i] = float64(cz[i])
+		}
+		ok := cs[i] != 0
+		if successful != nil {
+			successful[i] = ok
+		}
+		if !ok {
+			failed = true
+		}
+	}
+	if failed && successful == nil {
+		return fmt.Errorf("some or all points failed to transform")
+	}
+	return nil
 }
 
 type cgoContext struct {

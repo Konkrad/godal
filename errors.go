@@ -157,6 +157,8 @@ func ErrLogger(fn ErrorHandler) interface {
 	ViewshedOption
 	SetGCPsOption
 	GCPsToGeoTransformOption
+	NewTPSTransformerOption
+	TPSTransformOption
 	RegisterPluginOption
 	ExecuteSQLOption
 	StartTransactionOption
@@ -397,6 +399,12 @@ func (ec errorCallback) setSetGCPsOpt(o *setGCPsOpts) {
 	o.errorHandler = ec.fn
 }
 func (ec errorCallback) setGCPsToGeoTransformOpts(o *gcpsToGeoTransformOpts) {
+	o.errorHandler = ec.fn
+}
+func (ec errorCallback) setNewTPSTransformerOpt(o *newTPSTransformerOpts) {
+	o.errorHandler = ec.fn
+}
+func (ec errorCallback) setTPSTransformOpt(o *tpsTransformOpts) {
 	o.errorHandler = ec.fn
 }
 func (ec errorCallback) setRegisterPluginOpt(o *registerPluginOpts) {

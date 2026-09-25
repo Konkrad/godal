@@ -2043,3 +2043,46 @@ void godalGCPListToGeoTransform(cctx *ctx, goGCPList GCPList, int numGCPs, doubl
 
 	godalUnwrap();
 }
+
+// godalNewTPSTransformer builds a thin-plate-spline transformer from a raster's Ground Control
+// Points, for rasters (e.g. Sentinel-1 GRD/SLC) that have no affine geotransform. The GCP list is
+// only needed to fit the spline; GDALCreateTPSTransformer copies what it needs, so it is freed
+// here rather than kept alive for the lifetime of the returned transformer.
+void *godalNewTPSTransformer(cctx *ctx, goGCPList GCPList, int numGCPs, int bReversed) {
+	godalWrap(ctx);
+
+	GDAL_GCP *GDALGCPList = goGCPListToGDALGCP(GCPList, numGCPs);
+
+	void *transformArg = GDALCreateTPSTransformer(numGCPs, GDALGCPList, bReversed);
+
+	GDALDeinitGCPs(numGCPs, GDALGCPList);
+	CPLFree(GDALGCPList);
+
+	if (transformArg == nullptr) {
+		forceError(ctx);
+	}
+
+	godalUnwrap();
+	return transformArg;
+}
+
+// godalTPSTransform transforms points in place using a transformer created by
+// godalNewTPSTransformer. bDstToSrc selects the direction: FALSE maps pixel/line (as given by the
+// GCPs) to georeferenced coordinates, TRUE maps georeferenced coordinates back to pixel/line.
+// panSuccess receives, per point, whether the transform succeeded (points far outside the GCPs'
+// domain can fail); it must not be nullptr.
+void godalTPSTransform(cctx *ctx, void *transformArg, int bDstToSrc, int nPointCount, double *x, double *y, double *z, int *panSuccess) {
+	godalWrap(ctx);
+
+	int ret = GDALTPSTransform(transformArg, bDstToSrc, nPointCount, x, y, z, panSuccess);
+	if(ret!=TRUE) {
+		forceError(ctx);
+	}
+
+	godalUnwrap();
+}
+
+// godalDestroyTPSTransformer releases a transformer created by godalNewTPSTransformer.
+void godalDestroyTPSTransformer(void *transformArg) {
+	GDALDestroyTPSTransformer(transformArg);
+}
