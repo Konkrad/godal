@@ -4329,45 +4329,6 @@ func gdalGCPToGoGCPArray(gcp C.GCPsAndCount) []GCP {
 	return ret
 }
 
-// goGCPArrayToGDALGCPList converts a `[]GCP` (Go) to a `C.goGCPList`. The returned function must
-// be called to release the C strings once the list is no longer needed.
-func goGCPArrayToGDALGCPList(GCPList []GCP) (C.goGCPList, func()) {
-	var gcpList C.goGCPList
-	var (
-		ids       = make([]string, len(GCPList))
-		infos     = make([]string, len(GCPList))
-		gcpPixels = make([]float64, len(GCPList))
-		gcpLines  = make([]float64, len(GCPList))
-		gcpXs     = make([]float64, len(GCPList))
-		gcpYs     = make([]float64, len(GCPList))
-		gcpZs     = make([]float64, len(GCPList))
-	)
-	for i, g := range GCPList {
-		ids[i] = g.PszId
-		infos[i] = g.PszInfo
-		gcpPixels[i] = (g.DfGCPPixel)
-		gcpLines[i] = (g.DfGCPLine)
-		gcpXs[i] = (g.DfGCPX)
-		gcpYs[i] = (g.DfGCPY)
-		gcpZs[i] = (g.DfGCPZ)
-	}
-	cIds := sliceToCStringArray(ids)
-	cInfos := sliceToCStringArray(infos)
-
-	gcpList.pszIds = cIds.cPointer()
-	gcpList.pszInfos = cInfos.cPointer()
-	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
-	gcpList.dfGCPLines = cDoubleArray(gcpLines)
-	gcpList.dfGCPXs = cDoubleArray(gcpXs)
-	gcpList.dfGCPYs = cDoubleArray(gcpYs)
-	gcpList.dfGCPZs = cDoubleArray(gcpZs)
-
-	return gcpList, func() {
-		cIds.free()
-		cInfos.free()
-	}
-}
-
 // GetGCPSpatialRef runs the GDALGetGCPSpatialRef function
 func (ds *Dataset) GCPSpatialRef() *SpatialRef {
 	return &SpatialRef{handle: C.godalGetGCPSpatialRef(ds.handle()), isOwned: false}
@@ -4391,8 +4352,38 @@ func (ds *Dataset) SetGCPs(GCPList []GCP, opts ...SetGCPsOption) error {
 		opt.setSetGCPsOpt(&setGCPsOpts)
 	}
 
-	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
-	defer freeGCPList()
+	// Convert `[]GCP` -> `C.goGCPList`
+	var gcpList C.goGCPList
+	var (
+		ids       = make([]string, len(GCPList))
+		infos     = make([]string, len(GCPList))
+		gcpPixels = make([]float64, len(GCPList))
+		gcpLines  = make([]float64, len(GCPList))
+		gcpXs     = make([]float64, len(GCPList))
+		gcpYs     = make([]float64, len(GCPList))
+		gcpZs     = make([]float64, len(GCPList))
+	)
+	for i, g := range GCPList {
+		ids[i] = g.PszId
+		infos[i] = g.PszInfo
+		gcpPixels[i] = (g.DfGCPPixel)
+		gcpLines[i] = (g.DfGCPLine)
+		gcpXs[i] = (g.DfGCPX)
+		gcpYs[i] = (g.DfGCPY)
+		gcpZs[i] = (g.DfGCPZ)
+	}
+	cIds := sliceToCStringArray(ids)
+	defer cIds.free()
+	cInfos := sliceToCStringArray(infos)
+	defer cInfos.free()
+
+	gcpList.pszIds = cIds.cPointer()
+	gcpList.pszInfos = cInfos.cPointer()
+	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
+	gcpList.dfGCPLines = cDoubleArray(gcpLines)
+	gcpList.dfGCPXs = cDoubleArray(gcpXs)
+	gcpList.dfGCPYs = cDoubleArray(gcpYs)
+	gcpList.dfGCPZs = cDoubleArray(gcpZs)
 
 	cgc := createCGOContext(nil, setGCPsOpts.errorHandler)
 	if setGCPsOpts.sr != nil {
@@ -4416,8 +4407,38 @@ func GCPsToGeoTransform(GCPList []GCP, opts ...GCPsToGeoTransformOption) ([6]flo
 		opt.setGCPsToGeoTransformOpts(&gco)
 	}
 
-	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
-	defer freeGCPList()
+	// Convert `[]GCP` -> `C.goGCPList`
+	var gcpList C.goGCPList
+	var (
+		ids       = make([]string, len(GCPList))
+		infos     = make([]string, len(GCPList))
+		gcpPixels = make([]float64, len(GCPList))
+		gcpLines  = make([]float64, len(GCPList))
+		gcpXs     = make([]float64, len(GCPList))
+		gcpYs     = make([]float64, len(GCPList))
+		gcpZs     = make([]float64, len(GCPList))
+	)
+	for i, g := range GCPList {
+		ids[i] = g.PszId
+		infos[i] = g.PszInfo
+		gcpPixels[i] = (g.DfGCPPixel)
+		gcpLines[i] = (g.DfGCPLine)
+		gcpXs[i] = (g.DfGCPX)
+		gcpYs[i] = (g.DfGCPY)
+		gcpZs[i] = (g.DfGCPZ)
+	}
+	cIds := sliceToCStringArray(ids)
+	defer cIds.free()
+	cInfos := sliceToCStringArray(infos)
+	defer cInfos.free()
+
+	gcpList.pszIds = cIds.cPointer()
+	gcpList.pszInfos = cInfos.cPointer()
+	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
+	gcpList.dfGCPLines = cDoubleArray(gcpLines)
+	gcpList.dfGCPXs = cDoubleArray(gcpXs)
+	gcpList.dfGCPYs = cDoubleArray(gcpYs)
+	gcpList.dfGCPZs = cDoubleArray(gcpZs)
 
 	gt := make([]C.double, 6)
 	cgt := (*C.double)(unsafe.Pointer(&gt[0]))
@@ -4454,8 +4475,38 @@ func NewTPSTransformer(GCPList []GCP, reversed bool, opts ...NewTPSTransformerOp
 		opt.setNewTPSTransformerOpt(&o)
 	}
 
-	gcpList, freeGCPList := goGCPArrayToGDALGCPList(GCPList)
-	defer freeGCPList()
+	// Convert `[]GCP` -> `C.goGCPList`
+	var gcpList C.goGCPList
+	var (
+		ids       = make([]string, len(GCPList))
+		infos     = make([]string, len(GCPList))
+		gcpPixels = make([]float64, len(GCPList))
+		gcpLines  = make([]float64, len(GCPList))
+		gcpXs     = make([]float64, len(GCPList))
+		gcpYs     = make([]float64, len(GCPList))
+		gcpZs     = make([]float64, len(GCPList))
+	)
+	for i, g := range GCPList {
+		ids[i] = g.PszId
+		infos[i] = g.PszInfo
+		gcpPixels[i] = (g.DfGCPPixel)
+		gcpLines[i] = (g.DfGCPLine)
+		gcpXs[i] = (g.DfGCPX)
+		gcpYs[i] = (g.DfGCPY)
+		gcpZs[i] = (g.DfGCPZ)
+	}
+	cIds := sliceToCStringArray(ids)
+	defer cIds.free()
+	cInfos := sliceToCStringArray(infos)
+	defer cInfos.free()
+
+	gcpList.pszIds = cIds.cPointer()
+	gcpList.pszInfos = cInfos.cPointer()
+	gcpList.dfGCPPixels = cDoubleArray(gcpPixels)
+	gcpList.dfGCPLines = cDoubleArray(gcpLines)
+	gcpList.dfGCPXs = cDoubleArray(gcpXs)
+	gcpList.dfGCPYs = cDoubleArray(gcpYs)
+	gcpList.dfGCPZs = cDoubleArray(gcpZs)
 
 	bReversed := C.int(0)
 	if reversed {
