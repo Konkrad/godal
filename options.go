@@ -1429,6 +1429,30 @@ type GCPsToGeoTransformOption interface {
 	setGCPsToGeoTransformOpts(gcpGtOpt *gcpsToGeoTransformOpts)
 }
 
+type newTPSTransformerOpts struct {
+	errorHandler ErrorHandler
+}
+
+// NewTPSTransformerOption is an option that can be passed to NewTPSTransformer()
+//
+// Available NewTPSTransformerOptions are:
+//   - ErrLogger
+type NewTPSTransformerOption interface {
+	setNewTPSTransformerOpt(o *newTPSTransformerOpts)
+}
+
+type tpsTransformOpts struct {
+	errorHandler ErrorHandler
+}
+
+// TPSTransformOption is an option that can be passed to TPSTransformer.Transform()
+//
+// Available TPSTransformOptions are:
+//   - ErrLogger
+type TPSTransformOption interface {
+	setTPSTransformOpt(o *tpsTransformOpts)
+}
+
 type gcpProjStringOpt struct {
 	projString string
 }
